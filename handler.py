@@ -311,7 +311,24 @@ def get_available_models():
                     available_models["checkpoints"] = (
                         ckpt_options[0] if isinstance(ckpt_options[0], list) else []
                     )
-
+        if "UNETLoader" in object_info:
+            unet_info = object_info["UNETLoader"]
+            if "input" in unet_info and "required" in unet_info["input"]:
+                unet_options = unet_info["input"]["required"].get("unet_name")
+                if unet_options and len(unet_options) > 0:
+                    available_models["unets"] = (
+                        unet_options[0] if isinstance(unet_options[0], list) else []
+                    )
+        if "UnetLoaderGGUF" in object_info:
+            unet_gguf_info = object_info["UnetLoaderGGUF"]
+            if "input" in unet_gguf_info and "required" in unet_gguf_info["input"]:
+                unet_gguf_options = unet_gguf_info["input"]["required"].get("unet_name")
+                if unet_gguf_options and len(unet_gguf_options) > 0:
+                    available_models["unets_gguf"] = (
+                        unet_gguf_options[0]
+                        if isinstance(unet_gguf_options[0], list)
+                        else []
+                    )
         return available_models
     except Exception as e:
         print(f"worker-comfyui - Warning: Could not fetch available models: {e}")
@@ -383,7 +400,7 @@ def queue_workflow(workflow, client_id):
                 available_models = get_available_models()
                 if available_models.get("checkpoints"):
                     error_message += f"\n\nThis usually means a required model or parameter is not available."
-                    error_message += f"\nAvailable checkpoint models: {', '.join(available_models['checkpoints'])}"
+                    error_message += f"\nAvailable checkpoint/diffusion models: {', '.join(available_models['checkpoints'])}"
                 else:
                     error_message += "\n\nThis usually means a required model or parameter is not available."
                     error_message += "\nNo checkpoint models appear to be available. Please check your model installation."
@@ -402,8 +419,12 @@ def queue_workflow(workflow, client_id):
                     for detail in error_details
                 ):
                     available_models = get_available_models()
-                    if available_models.get("checkpoints"):
-                        detailed_message += f"\n\nAvailable checkpoint models: {', '.join(available_models['checkpoints'])}"
+                    if (
+                        available_models.get("checkpoints")
+                        or available_models.get("unets")
+                        or available_models.get("unets_gguf")
+                    ):
+                        detailed_message += f"\n\nAvailable checkpoint/diffusion models: {', '.join(available_models.get('checkpoints', []) + available_models.get('unets', []) + available_models.get('unets_gguf', []))}"
                     else:
                         detailed_message += "\n\nNo checkpoint models appear to be available. Please check your model installation."
 
@@ -456,8 +477,10 @@ def get_image_data(filename, subfolder, image_type):
     )
     data = {"filename": filename, "subfolder": subfolder, "type": image_type}
     url_values = urllib.parse.urlencode(data)
+    print(url_values)
     try:
         # Use requests for consistency and timeout
+        print(f"http://{COMFY_HOST}/view?{url_values}")
         response = requests.get(f"http://{COMFY_HOST}/view?{url_values}", timeout=60)
         response.raise_for_status()
         print(f"worker-comfyui - Successfully fetched image data for {filename}")
@@ -471,6 +494,35 @@ def get_image_data(filename, subfolder, image_type):
     except Exception as e:
         print(
             f"worker-comfyui - Unexpected error fetching image data for {filename}: {e}"
+        )
+        return None
+
+
+def get_video_data(filename, file_location):
+    """
+    Fetch video bytes from the local filesystem.
+
+    Args:
+        filename (str): The filename of the video.
+        file_location (str): The full path where the video is stored.
+
+    Returns:
+        bytes: The raw video data, or None if an error occurs.
+    """
+    print(
+        f"worker-comfyui - Fetching video data: filename={filename}, file_location={file_location}"
+    )
+    try:
+        with open(file_location, "rb") as video_file:
+            video_data = video_file.read()
+            print(f"worker-comfyui - Successfully fetched video data for {filename}")
+            return video_data
+    except FileNotFoundError:
+        print(f"worker-comfyui - Video file not found: {file_location}")
+        return None
+    except Exception as e:
+        print(
+            f"worker-comfyui - Unexpected error fetching video data for {filename}: {e}"
         )
         return None
 
@@ -645,6 +697,7 @@ def handler(job):
 
         print(f"worker-comfyui - Processing {len(outputs)} output nodes...")
         for node_id, node_output in outputs.items():
+            print(f"worker-comfyui - Processing node {node_id} output {node_output}...")
             if "images" in node_output:
                 print(
                     f"worker-comfyui - Node {node_id} contains {len(node_output['images'])} image(s)"
@@ -694,6 +747,7 @@ def handler(job):
                                     {
                                         "filename": filename,
                                         "type": "s3_url",
+                                        "output_type": "image",
                                         "data": s3_url,
                                     }
                                 )
@@ -722,6 +776,7 @@ def handler(job):
                                         "filename": filename,
                                         "type": "base64",
                                         "data": base64_image,
+                                        "output_type": "image",
                                     }
                                 )
                                 print(f"worker-comfyui - Encoded {filename} as base64")
@@ -732,6 +787,88 @@ def handler(job):
                     else:
                         error_msg = f"Failed to fetch image data for {filename} from /view endpoint."
                         errors.append(error_msg)
+
+            if "gifs" in node_output:
+                print(
+                    f"worker-comfyui - Node {node_id} contains {len(node_output['gifs'])} video(s)"
+                )
+                for video_info in node_output["gifs"]:
+                    print(f"worker-comfyui - video_info: {video_info}")
+                    filename = video_info.get("filename")
+                    if video_info.get("type") == "temp":
+                        print(
+                            f"worker-comfyui - Skipping video {filename} because type is 'temp'"
+                        )
+                        continue
+
+                    if not filename:
+                        warn_msg = f"Skipping video in node {node_id} due to missing filename: {video_info}"
+                        print(f"worker-comfyui - {warn_msg}")
+                        errors.append(warn_msg)
+                        continue
+
+                    video_bytes = get_video_data(filename, video_info.get("fullpath"))
+                    if video_bytes:
+                        file_extension = os.path.splitext(filename)[1] or ".mp4"
+
+                        if os.environ.get("BUCKET_ENDPOINT_URL"):
+                            file_location = video_info.get("fullpath")
+                            try:
+                                print(f"worker-comfyui - Uploading {filename} to S3...")
+                                s3_url = rp_upload.upload_file_to_bucket(
+                                    file_name=filename,
+                                    file_location=file_location,
+                                    prefix=f"comfy/{job_id}",
+                                    extra_args={
+                                        "ContentType": f"video/{filename.split('.')[-1]}"
+                                    },
+                                )
+                                os.remove(file_location)  # Clean up local video file
+                                print(
+                                    f"worker-comfyui - Uploaded {filename} to S3: {s3_url}"
+                                )
+                                # Append dictionary with filename and URL
+                                output_data.append(
+                                    {
+                                        "filename": filename,
+                                        "type": "s3_url",
+                                        "output_type": "video",
+                                        "data": s3_url,
+                                    }
+                                )
+                            except Exception as e:
+                                error_msg = f"Error uploading {filename} to S3: {e}"
+                                print(f"worker-comfyui - {error_msg}")
+                                errors.append(error_msg)
+                                if "file_location" in locals() and os.path.exists(
+                                    file_location
+                                ):
+                                    try:
+                                        os.remove(file_location)
+                                    except OSError as rm_err:
+                                        print(
+                                            f"worker-comfyui - Error removing local video file {file_location}: {rm_err}"
+                                        )
+                        else:
+                            # Return as base64 string
+                            try:
+                                base64_video = base64.b64encode(video_bytes).decode(
+                                    "utf-8"
+                                )
+                                # Append dictionary with filename and base64 data
+                                output_data.append(
+                                    {
+                                        "filename": filename,
+                                        "type": "base64",
+                                        "output_type": "video",
+                                        "data": base64_video,
+                                    }
+                                )
+                                print(f"worker-comfyui - Encoded {filename} as base64")
+                            except Exception as e:
+                                error_msg = f"Error encoding {filename} to base64: {e}"
+                                print(f"worker-comfyui - {error_msg}")
+                                errors.append(error_msg)
 
             # Check for other output types
             other_keys = [k for k in node_output.keys() if k != "images"]
@@ -768,7 +905,13 @@ def handler(job):
     final_result = {}
 
     if output_data:
-        final_result["images"] = output_data
+        # Split output_data into images and videos for clarity
+        final_result["images"] = [
+            item for item in output_data if item.get("output_type") == "image"
+        ]
+        final_result["videos"] = [
+            item for item in output_data if item.get("output_type") == "video"
+        ]
 
     if errors:
         final_result["errors"] = errors
