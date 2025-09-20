@@ -10,7 +10,8 @@
 
 ---
 
-This project allows you to run ComfyUI workflows as a serverless API endpoint on the RunPod platform. Submit workflows via API calls and receive generated images as base64 strings or S3 URLs.
+This project allows you to run ComfyUI workflows as a serverless API endpoint on the RunPod platform. Submit workflows via API calls and receive generated images and videos as base64 strings or S3 URLs.
+Forked from the original project to add support for returning videos (in addition to images) as base64 or S3 URLs. No automatic tests written; video and image support works via Dockerfile, but is not tested with snapshots.
 
 ## Table of Contents
 
@@ -117,6 +118,13 @@ Each object within the `input.images` array must contain:
         "type": "base64",
         "data": "iVBORw0KGgoAAAANSUhEUg..."
       }
+    ],
+    "videos": [
+      {
+        "filename": "ComfyUI_00001_.mp4",
+        "type": "base64",
+        "data": "AAAAFGZ0eXBN..."
+      }
     ]
   },
   "delayTime": 123,
@@ -128,24 +136,25 @@ Each object within the `input.images` array must contain:
 | --------------- | ---------------- | -------- | ----------------------------------------------------------------------------------------------------------- |
 | `output`        | Object           | Yes      | Top-level object containing the results of the job execution.                                               |
 | `output.images` | Array of Objects | No       | Present if the workflow generated images. Contains a list of objects, each representing one output image.   |
+| `output.videos` | Array of Objects | No       | Present if the workflow generated videos. Contains a list of objects, each representing one output video.   |
 | `output.errors` | Array of Strings | No       | Present if non-fatal errors or warnings occurred during processing (e.g., S3 upload failure, missing data). |
 
-#### `output.images`
+#### `output.images` and `output.videos`
 
-Each object in the `output.images` array has the following structure:
+Each object in the `output.images` or `output.videos` array has the following structure:
 
 | Field Name | Type   | Description                                                                                     |
 | ---------- | ------ | ----------------------------------------------------------------------------------------------- |
 | `filename` | String | The original filename assigned by ComfyUI during generation.                                    |
 | `type`     | String | Indicates the format of the data. Either `"base64"` or `"s3_url"` (if S3 upload is configured). |
-| `data`     | String | Contains either the base64 encoded image string or the S3 URL for the uploaded image file.      |
+| `data`     | String | Contains either the base64 encoded image/video string or the S3 URL for the uploaded file.      |
 
 > [!NOTE]
-> The `output.images` field provides a list of all generated images (excluding temporary ones).
+> The `output.images` and `output.videos` fields provide lists of all generated images and videos (excluding temporary ones).
 >
-> - If S3 upload is **not** configured (default), `type` will be `"base64"` and `data` will contain the base64 encoded image string.
+> - If S3 upload is **not** configured (default), `type` will be `"base64"` and `data` will contain the base64 encoded image or video string.
 > - If S3 upload **is** configured, `type` will be `"s3_url"` and `data` will contain the S3 URL. See the [Configuration Guide](docs/configuration.md#example-s3-response) for an S3 example response.
-> - Clients interacting with the API need to handle this list-based structure under `output.images`.
+> - Clients interacting with the API need to handle these list-based structures under `output.images` and `output.videos`.
 
 ## Usage
 
@@ -154,7 +163,7 @@ To interact with your deployed RunPod endpoint:
 1.  **Get API Key:** Generate a key in RunPod [User Settings](https://www.runpod.io/console/serverless/user/settings) (`API Keys` section).
 2.  **Get Endpoint ID:** Find your endpoint ID on the [Serverless Endpoints](https://www.runpod.io/console/serverless/user/endpoints) page or on the `Overview` page of your endpoint.
 
-### Generate Image (Sync Example)
+### Generate Image or Video (Sync Example)
 
 Send a workflow to the `/runsync` endpoint (waits for completion). Replace `<api_key>` and `<endpoint_id>`. The `-d` value should contain the [JSON input described above](#input).
 
@@ -165,6 +174,8 @@ curl -X POST \
   -d '{"input":{"workflow":{... your workflow JSON ...}}}' \
   https://api.runpod.ai/v2/<endpoint_id>/runsync
 ```
+
+If your workflow generates videos, they will be returned in the `output.videos` array (as base64 or S3 URLs, depending on configuration). Images are returned in `output.images` as before.
 
 You can also use the `/run` endpoint for asynchronous jobs and then poll the `/status` to see when the job is done. Or you [add a `webhook` into your request](https://docs.runpod.io/serverless/endpoints/send-requests#webhook-notifications) to be notified when the job is done.
 
