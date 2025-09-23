@@ -1,6 +1,6 @@
 services:
   comfyui-worker:
-    image: runpod/worker-comfyui:dev
+    image: visa42/runpod-comfyui-serverless:5.4.1-base
     pull_policy: never
     deploy:
       resources:
