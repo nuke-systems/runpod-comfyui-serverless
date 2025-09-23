@@ -11,7 +11,8 @@
 ---
 
 This project allows you to run ComfyUI workflows as a serverless API endpoint on the RunPod platform. Submit workflows via API calls and receive generated images and videos as base64 strings or S3 URLs.
-Forked from the original project to add support for returning videos (in addition to images) as base64 or S3 URLs.
+Forked from the original project to add support for UNETLoader and UnetLoaderGGUF to run videos, if using the comfy-core Create Video node, it returns in output.images, if using Video Combine from Video Helper Suite, it returns in output.videos
+To add your own models in Dockerfile, instead of using "FROM runpod/worker-comfyui:5.4.1-base" use "FROM visa42/runpod-comfyui-serverless:5.4.1-base"
 
 ## Table of Contents
 
