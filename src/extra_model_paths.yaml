@@ -16,4 +16,4 @@ runpod_worker_comfy:
   LLM: models/LLM/
   VLM: models/VLM/
   VLM/Qwen2.5-VL-7B-Instruct: models/VLM/Qwen2.5-VL-7B-Instruct/
-  LLM/Qwen2.5-VL-7B-Instruct: models/LLM/Qwen2.5-7B-Instruct/
+  LLM/Qwen2.5-VL-7B-Instruct: models/LLM/Qwen2.5-VL-7B-Instruct/
