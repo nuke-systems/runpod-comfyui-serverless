@@ -139,3 +139,5 @@ FROM base AS final
 
 # Copy models from stage 2 to the final image
 COPY --from=downloader /comfyui/models /comfyui/models
+
+RUN comfy-node-install comfyui-custom-scripts comfyui-frame-interpolation comfyui-kjnodes comfyui-videohelpersuite ComfyUI-GGUF qwen2_5-vl
