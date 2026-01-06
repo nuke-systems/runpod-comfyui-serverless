@@ -116,7 +116,16 @@ Each object within the `input.images` array must contain:
       {
         "filename": "ComfyUI_00001_.png",
         "type": "base64",
+        "output_type": "image",
         "data": "iVBORw0KGgoAAAANSUhEUg..."
+      }
+    ],
+    "videos": [
+      {
+        "filename": "ComfyUI_00001_.mp4",
+        "type": "base64",
+        "output_type": "video",
+        "data": "AAAAIGZ0eXBpc29tAAACAGlzb21pc28y..."
       }
     ]
   },
@@ -129,17 +138,19 @@ Each object within the `input.images` array must contain:
 | --------------- | ---------------- | -------- | ----------------------------------------------------------------------------------------------------------- |
 | `output`        | Object           | Yes      | Top-level object containing the results of the job execution.                                               |
 | `output.images` | Array of Objects | No       | Present if the workflow generated images. Contains a list of objects, each representing one output image.   |
+| `output.videos` | Array of Objects | No       | Present if the workflow generated videos. Contains a list of objects, each representing one output video.   |
 | `output.errors` | Array of Strings | No       | Present if non-fatal errors or warnings occurred during processing (e.g., S3 upload failure, missing data). |
 
 #### `output.images`
 
 Each object in the `output.images` array has the following structure:
 
-| Field Name | Type   | Description                                                                                     |
-| ---------- | ------ | ----------------------------------------------------------------------------------------------- |
-| `filename` | String | The original filename assigned by ComfyUI during generation.                                    |
-| `type`     | String | Indicates the format of the data. Either `"base64"` or `"s3_url"` (if S3 upload is configured). |
-| `data`     | String | Contains either the base64 encoded image string or the S3 URL for the uploaded image file.      |
+| Field Name    | Type   | Description                                                                                     |
+| ------------- | ------ | ----------------------------------------------------------------------------------------------- |
+| `filename`    | String | The original filename assigned by ComfyUI during generation.                                    |
+| `type`        | String | Indicates the format of the data. Either `"base64"` or `"s3_url"` (if S3 upload is configured). |
+| `output_type` | String | The media type. Always `"image"` for items in this array.                                       |
+| `data`        | String | Contains either the base64 encoded image string or the S3 URL for the uploaded image file.      |
 
 > [!NOTE]
 > The `output.images` field provides a list of all generated images (excluding temporary ones).
@@ -147,6 +158,25 @@ Each object in the `output.images` array has the following structure:
 > - If S3 upload is **not** configured (default), `type` will be `"base64"` and `data` will contain the base64 encoded image string.
 > - If S3 upload **is** configured, `type` will be `"s3_url"` and `data` will contain the S3 URL. See the [Configuration Guide](docs/configuration.md#example-s3-response) for an S3 example response.
 > - Clients interacting with the API need to handle this list-based structure under `output.images`.
+
+#### `output.videos`
+
+Each object in the `output.videos` array has the following structure:
+
+| Field Name    | Type   | Description                                                                                     |
+| ------------- | ------ | ----------------------------------------------------------------------------------------------- |
+| `filename`    | String | The original filename assigned by ComfyUI during generation.                                    |
+| `type`        | String | Indicates the format of the data. Either `"base64"` or `"s3_url"` (if S3 upload is configured). |
+| `output_type` | String | The media type. Always `"video"` for items in this array.                                       |
+| `data`        | String | Contains either the base64 encoded video string or the S3 URL for the uploaded video file.      |
+
+> [!NOTE]
+> The `output.videos` field provides a list of all generated videos (excluding temporary ones).
+>
+> - If S3 upload is **not** configured (default), `type` will be `"base64"` and `data` will contain the base64 encoded video string.
+> - If S3 upload **is** configured, `type` will be `"s3_url"` and `data` will contain the S3 URL.
+> - Video outputs are supported for workflows that generate animations (e.g., GIFs, MP4s, WebMs).
+> - Clients interacting with the API need to handle this list-based structure under `output.videos`.
 
 ## Usage
 
