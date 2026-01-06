@@ -808,6 +808,7 @@ def handler(job):
                                         "filename": filename,
                                         "type": "base64",
                                         "data": base64_image,
+                                        "output_type": "image",
                                     }
                                 )
                                 print(f"worker-comfyui - Encoded {filename} as base64")
